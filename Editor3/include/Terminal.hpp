@@ -68,6 +68,35 @@ private:
 	bool m_IsCtrl;
 };
 
+/// Terminal key representation.
+typedef unsigned TerminalKey;
+
+namespace TerminalKeys
+{
+	enum
+	{
+		ARROW_LEFT = 1000,
+		ARROW_RIGHT,
+		ARROW_UP,
+		ARROW_DOWN
+	};
+}
+
+/// TerminalKey with CTRL.
+inline constexpr TerminalKey TerminalKeyCtrl(TerminalKey key)
+{
+	return key & 0x1F;
+}
+
+/// Terminal coordinate representation. Also used to represent size of a terminal.
+struct TerminalCoord
+{
+	/// The X coordinate.
+	unsigned column;
+	/// The Y coordinate.
+	unsigned row;
+};
+
 /// Interface for Terminal
 /// Note: all functions of a Terminal may raise UnrecoverableTerminalImplementationError.
 class Terminal
@@ -78,6 +107,9 @@ public:
 	/// A virtual destruct of a Terminal.
 	virtual ~Terminal() {}
 
+    /// Get the terminal size. The result value may vary during the execution.
+	virtual const TerminalCoord GetSize() = 0;
+	
 	/// Enable a terminal feature. Do not do anything if it is already on.
 	virtual void EnableFeature(TerminalFeature feature) = 0;
 	/// Disable a terminal feature. Do not do anything if it is already off.
@@ -87,20 +119,27 @@ public:
 	/// Note: the implementation may not support the exact timeout, but it should set it to the most close possible value.
 	virtual void SetReadTimeout(unsigned timeout) = 0;
 
-	virtual char WaitAndReadKey() = 0;
-
 	/// Clear entire screen.
 	virtual void ClearScreen() = 0;
+	/// Clear row on the cursor.
+	virtual void ClearCurrentRow() = 0;
 
+    /// Get the position of terminal cursor.
+	virtual const TerminalCoord GetCursorPosition() = 0;
 	/// Position the Terminal's cursor.
-	/// Note: the origin is at the top left corner and its coordinate is (1;1).
-	virtual void PositionCursor(unsigned x, unsigned y) = 0;
+	/// Note: the origin is at the top left corner and its coordinate is (0; 0).
+	virtual void SetCursorPosition(TerminalCoord coord) = 0;
+	
+	/// Hide terminal cursor. Do nothing if hidden,
+	virtual void HideCursor() = 0;
+	/// Show terminal cursor. Do nothing if shown.
+	virtual void ShowCursor() = 0;
 	
 	/// Print a string.
 	virtual void PrintString(const std::string& str) = 0;
-};
 
-#define CTRL_KEY(k) ((k) & 0x1f)
+	virtual TerminalKey WaitAndReadKey() = 0;
+};
 
 /// A terminal based on standard input and output streams.
 // TODO: Should it be a raw pointer or smart pointer?
