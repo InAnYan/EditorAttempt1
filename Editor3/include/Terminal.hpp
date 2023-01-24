@@ -97,8 +97,10 @@ struct TerminalCoord
 	unsigned row;
 };
 
-/// Interface for Terminal
+/// Interface for Terminal.
 /// Note: all functions of a Terminal may raise UnrecoverableTerminalImplementationError.
+/// Note: there are instant operations and buffered. The result of instant operation will be instant. The result of buffered operation may be seen only after call to Terminal::Flush or without the call.
+/// Note: The implementation is permitted to perform buffered operations as instant.
 class Terminal
 {
 public:
@@ -107,38 +109,49 @@ public:
 	/// A virtual destruct of a Terminal.
 	virtual ~Terminal() {}
 
-    /// Get the terminal size. The result value may vary during the execution.
+	/// Instant operations:
+	
+    /// Get the terminal size (instant operation). The result value may vary during the execution.
 	virtual const TerminalCoord GetSize() = 0;
 	
-	/// Enable a terminal feature. Do not do anything if it is already on.
+	/// Enable a terminal feature (instant operation). Do not do anything if it is already on.
 	virtual void EnableFeature(TerminalFeature feature) = 0;
-	/// Disable a terminal feature. Do not do anything if it is already off.
+	/// Disable a terminal feature (instant operation). Do not do anything if it is already off.
 	virtual void DisableFeature(TerminalFeature feature) = 0;
 
-	/// Set the timeout for read. The timeout measured in miliseconds.
+	/// Set the timeout for read (instant operation). The timeout measured in miliseconds.
 	/// Note: the implementation may not support the exact timeout, but it should set it to the most close possible value.
 	virtual void SetReadTimeout(unsigned timeout) = 0;
 
-	/// Clear entire screen.
+	/// Get the position of terminal cursor (instant operation).
+	virtual const TerminalCoord GetCursorPosition() = 0;
+
+	/// UNDOCUMENTED (immediate operation).
+	// TODO: DOCUMENT.
+	virtual TerminalKey WaitAndReadKey() = 0;
+
+	/// Perform all buferred operations at once.
+	virtual void Flush() = 0;
+	
+	/// Buffered operations:
+	
+	/// Clear entire screen (buffered operation).
 	virtual void ClearScreen() = 0;
-	/// Clear row on the cursor.
+	/// Clear row on the cursor (buffered operation).
 	virtual void ClearCurrentRow() = 0;
 
-    /// Get the position of terminal cursor.
-	virtual const TerminalCoord GetCursorPosition() = 0;
-	/// Position the Terminal's cursor.
+    
+	/// Position the Terminal's cursor (buffered operation).
 	/// Note: the origin is at the top left corner and its coordinate is (0; 0).
 	virtual void SetCursorPosition(TerminalCoord coord) = 0;
 	
-	/// Hide terminal cursor. Do nothing if hidden,
+	/// Hide terminal cursor (buffered operation). Do nothing if hidden,
 	virtual void HideCursor() = 0;
-	/// Show terminal cursor. Do nothing if shown.
+	/// Show terminal cursor (buffered operation). Do nothing if shown.
 	virtual void ShowCursor() = 0;
 	
-	/// Print a string.
-	virtual void PrintString(const std::string& str) = 0;
-
-	virtual TerminalKey WaitAndReadKey() = 0;
+	/// Print a string (buffered operation).
+	virtual void WriteString(const std::string& str) = 0;
 };
 
 /// A terminal based on standard input and output streams.
