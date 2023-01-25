@@ -12,39 +12,56 @@
 #include <stdlib.h>
 
 /// Enter the raw mode. May throw an UnrecoverableTerminalImplementationError.
-void EnterRawMode(Terminal& terminal);
+void EnterRawMode(std::shared_ptr<Terminal> terminal);
 /// Exit the raw mode. Ignore all UnrecoverableTerminalImplementationError.
-void ExitRawMode(Terminal& terminal);
+void ExitRawMode(std::shared_ptr<Terminal> terminal);
 
 /// Full exit of the program with specific status. Print msg.
-void Die(int status, Terminal& terminal, const std::string& msg);
+void Die(int status, std::shared_ptr<Terminal> terminal, const std::string& msg);
 /// Full exit of the program with specific status. Print prefixStr first, then postfixStr.
-void Die(int status, Terminal& terminal, const std::string& prefixStr, const std::string& postfixStr);
+void Die(int status, std::shared_ptr<Terminal> terminal, const std::string& prefixStr, const std::string& postfixStr);
 
 int main(int argc, char* argv[])
 {
-	Terminal* terminal = CreateStdTerminal();
+	std::shared_ptr<Terminal> terminal = CreateStdTerminal();
+		
+	if (argc != 2)
+	{
+		Die(2, terminal, "Error: wrong arguments count.\n", "Usage: ed3 pathToFile");
+	}
 
 	try
 	{
-		EnterRawMode(*terminal);
+		std::ifstream file(argv[1]);
+		if (!file)
+		{
+			Die(3, terminal, "Error: unable to open the file.");
+		}
 
-		Editor editor;
-		bool running = true;
+		Editor editor(file);
+
+		if (file.fail() && !file.eof())
+		{
+			Die(4, terminal, "Error: an error occured while reading the file.");
+		}
+
+		EnterRawMode(terminal);
 		
+		bool running = true;
 		while (running)
 		{
-			editor.RefreshScreen(*terminal);
+			editor.RefreshScreen(terminal);
 			TerminalKey pressedKey = terminal->WaitAndReadKey();
 			running = editor.ProcessKey(pressedKey);
 		}
 	}
 	catch (const UnrecoverableTerminalImplementationError& e)
 	{
-		Die(1, *terminal, "FATAL ERROR: ", e.what());
+		ExitRawMode(terminal);
+		Die(1, terminal, "Fatal error: ", e.what());
 	}
 
-	ExitRawMode(*terminal);
+	ExitRawMode(terminal);
 	return 0;
 }
 
@@ -59,20 +76,20 @@ TerminalFeature g_RawModeFeaturesDisable[] =
 	TerminalFeature::OUTPUT_PROCESSING
 };
 
-void EnterRawMode(Terminal& terminal)
+void EnterRawMode(std::shared_ptr<Terminal> terminal)
 {
 	for (TerminalFeature feature : g_RawModeFeaturesDisable)
 	{
-		terminal.DisableFeature(feature);
+		terminal->DisableFeature(feature);
 	}
 }
 
-void ExitRawMode(Terminal& terminal)
+void ExitRawMode(std::shared_ptr<Terminal> terminal)
 {
 	try
 	{
-		terminal.ClearScreen();
-		terminal.Flush();
+		terminal->ClearScreen();
+		terminal->Flush();
 	}
 	catch (const UnrecoverableTerminalImplementationError& e)
 	{
@@ -83,7 +100,7 @@ void ExitRawMode(Terminal& terminal)
 	{
 		try
 		{
-			terminal.EnableFeature(feature);
+			terminal->EnableFeature(feature);
 		}
 		catch (const UnrecoverableTerminalImplementationError& e)
 		{
@@ -93,8 +110,8 @@ void ExitRawMode(Terminal& terminal)
 
 	try
 	{
-		terminal.SetCursorPosition({ 0, 0 });
-		terminal.Flush();
+		terminal->SetCursorPosition({ 0, 0 });
+		terminal->Flush();
 	}
 	catch (const UnrecoverableTerminalImplementationError& e)
 	{
@@ -102,27 +119,25 @@ void ExitRawMode(Terminal& terminal)
 	}
 }
 
-void Die(int status, Terminal& terminal, const std::string& msg)
+void Die(int status, std::shared_ptr<Terminal> terminal, const std::string& msg)
 {
-	ExitRawMode(terminal);
-
 	// TODO: What if there is an exception?
-	terminal.WriteString(msg);
-	terminal.WriteString("\n");
-	terminal.Flush();
-	
+	terminal->WriteString(msg);
+	terminal->WriteString("\n");
+	terminal->Flush();
+
 	exit(status);
 }
 
-void Die(int status, Terminal& terminal, const std::string& prefixStr, const std::string& postfixStr)
+void Die(int status, std::shared_ptr<Terminal> terminal, const std::string& prefixStr, const std::string& postfixStr)
 {
 	ExitRawMode(terminal);
 
 	// TODO: What if there is an exception?
-	terminal.WriteString(prefixStr);
-	terminal.WriteString(postfixStr);
-	terminal.WriteString("\n");
-	terminal.Flush();
-	
+	terminal->WriteString(prefixStr);
+	terminal->WriteString(postfixStr);
+	terminal->WriteString("\n");
+	terminal->Flush();
+
 	exit(status);
 }

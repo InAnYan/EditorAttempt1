@@ -108,7 +108,7 @@ public:
 		}
 	}
 
-	virtual void SetReadTimeout(unsigned timeout) override
+	virtual void SetReadTimeout(int timeout) override
 	{
 		struct termios cur;
 		if (tcgetattr(STDIN_FILENO, &cur) == -1)
@@ -128,7 +128,7 @@ public:
 	virtual TerminalKey WaitAndReadKey() override
 	{
 		int nread;
-		unsigned c;
+		int c = 0;
 		while((nread = read(STDIN_FILENO, &c, 1)) != 1)
 		{
 			if (nread == -1 && errno != EAGAIN)
@@ -162,7 +162,7 @@ public:
 	virtual const TerminalCoord GetCursorPosition() override
 	{
 		char buf[16];
-		unsigned i = 0;
+		int i = 0;
 
 		if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4)
 		{
@@ -266,7 +266,7 @@ private:
 	}
 
 	/// Convert raw key value to TerminalKey.
-	TerminalKey MakeKey(unsigned c)
+	TerminalKey MakeKey(int c)
 	{
 		// TODO: Support for Alt.
 		
@@ -357,9 +357,9 @@ private:
 	}
 };
 
-Terminal* CreateStdTerminal()
+std::shared_ptr<Terminal> CreateStdTerminal()
 {
-	return new UnixTerminal;
+	return std::make_shared<UnixTerminal>();
 }
 
 #endif // EDITOR_COMPILE_UNIX

@@ -11,6 +11,7 @@
 
 #include <exception>
 #include <string>
+#include <memory>
 
 /// Exception that represents an error on the implementation side.
 class UnrecoverableTerminalImplementationError : std::exception
@@ -49,12 +50,12 @@ class TerminalKey
 {
 public:
 	/// The constructructor of TerminalKey.
-	TerminalKey(unsigned character, bool isCtrl, bool isAlt)
+	TerminalKey(int character, bool isCtrl, bool isAlt)
 		: m_Char(character), m_IsCtrl(isCtrl), m_IsAlt(isAlt)
 	{}
 
 	/// Return the base character of the Key.
-	unsigned GetChar() const
+	int GetChar() const
 	{ return m_Char; }
 
 	// Return true if the key was modified by Ctrl.
@@ -67,7 +68,7 @@ public:
 	
 private:
 	/// Base character.
-	unsigned m_Char;
+	int m_Char;
 	/// Is Crtl'ed key.
 	bool m_IsCtrl;
 	/// Is Alt'ed key.
@@ -98,9 +99,9 @@ namespace TerminalKeys
 struct TerminalCoord
 {
 	/// The X coordinate.
-	unsigned column;
+	int column;
 	/// The Y coordinate.
-	unsigned row;
+	int row;
 };
 
 /// Interface for Terminal.
@@ -127,7 +128,7 @@ public:
 
 	/// Set the timeout for read (instant operation). The timeout measured in miliseconds.
 	/// Note: the implementation may not support the exact timeout, but it should set it to the most close possible value.
-	virtual void SetReadTimeout(unsigned timeout) = 0;
+	virtual void SetReadTimeout(int timeout) = 0;
 
 	/// Get the position of terminal cursor (instant operation).
 	virtual const TerminalCoord GetCursorPosition() = 0;
@@ -161,7 +162,6 @@ public:
 };
 
 /// A terminal based on standard input and output streams.
-// TODO: Should it be a raw pointer or smart pointer?
-Terminal* CreateStdTerminal();
+std::shared_ptr<Terminal> CreateStdTerminal();
 
 #endif // TERMINAL_HPP
