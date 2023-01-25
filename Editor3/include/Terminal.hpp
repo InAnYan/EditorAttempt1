@@ -45,32 +45,36 @@ enum class TerminalFeature
 };
 
 /// Information about key in key events.
-class Key
+class TerminalKey
 {
 public:
-	/// The constructructor of Key.
-	Key(char character, bool isCtrl)
-		: m_Char(character), m_IsCtrl(isCtrl)
+	/// The constructructor of TerminalKey.
+	TerminalKey(unsigned character, bool isCtrl, bool isAlt)
+		: m_Char(character), m_IsCtrl(isCtrl), m_IsAlt(isAlt)
 	{}
 
-	/// Return the raw character of the Key.
-	char getChar() const
+	/// Return the base character of the Key.
+	unsigned GetChar() const
 	{ return m_Char; }
 
-	/// Return true wherether the Ctrl key was pressed.
-	bool isCtrl() const
+	// Return true if the key was modified by Ctrl.
+	bool IsCtrl() const
 	{ return m_IsCtrl; }
+
+	// Return true if the key was modified by Alt.
+	bool IsAlt() const
+	{ return m_IsAlt; }
 	
 private:
-	/// Raw character.
-	char m_Char;
+	/// Base character.
+	unsigned m_Char;
 	/// Is Crtl'ed key.
 	bool m_IsCtrl;
+	/// Is Alt'ed key.
+	bool m_IsAlt;
 };
 
-/// Terminal key representation.
-typedef unsigned TerminalKey;
-
+// TODO: DOCUMENT.
 namespace TerminalKeys
 {
 	enum
@@ -78,14 +82,11 @@ namespace TerminalKeys
 		ARROW_LEFT = 1000,
 		ARROW_RIGHT,
 		ARROW_UP,
-		ARROW_DOWN
-	};
-}
+		ARROW_DOWN,
 
-/// TerminalKey with CTRL.
-inline constexpr TerminalKey TerminalKeyCtrl(TerminalKey key)
-{
-	return key & 0x1F;
+		PAGE_UP,
+		PAGE_DOWN
+	};
 }
 
 /// Terminal coordinate representation. Also used to represent size of a terminal.

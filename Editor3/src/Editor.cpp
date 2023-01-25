@@ -5,97 +5,130 @@
 #define WELCOME_MESSAGE "Welcome to the Editor! Version 0.0.1"
 
 Editor::Editor()
-	: m_Cursor{ 0, 0 }
+	: m_Cursor{ 0, 0 }, m_TerminalSize{ 0, 0 }
 {
 	
 }
 
 void Editor::RefreshScreen(Terminal& terminal)
 {
-	const TerminalCoord size = terminal.GetSize();
+	m_TerminalSize = terminal.GetSize();
 
 	terminal.HideCursor();
 	terminal.SetCursorPosition({ 0, 0 });
 
-	this->DrawRows(size, terminal);
+	this->DrawRows(terminal);
 	
 	terminal.SetCursorPosition(m_Cursor);
 	terminal.ShowCursor();
+
+	terminal.Flush();
 }
 
-void Editor::DrawRows(const TerminalCoord size, Terminal& terminal)
+void Editor::DrawRows(Terminal& terminal)
 {
-	for (int y = 0; y < size.row; y++)
+	for (int y = 0; y < m_TerminalSize.row; y++)
 	{
-		if (y == size.row / 3)
+		if (y == m_TerminalSize.row / 3)
 		{
-			if (size.column > sizeof(WELCOME_MESSAGE))
+			if (m_TerminalSize.column > sizeof(WELCOME_MESSAGE))
 			{
-				unsigned padding = (size.column - sizeof(WELCOME_MESSAGE)) / 2;
+				// TODO: Position the welcome string more pretty.
+				unsigned padding = (m_TerminalSize.column - sizeof(WELCOME_MESSAGE)) / 2;
 				if (padding != 0)
 				{
-					terminal.PrintString("~");
+					terminal.WriteString("~");
 					padding--;
 				}
 
-				terminal.PrintString(std::string(padding, ' '));
+				terminal.WriteString(std::string(padding, ' '));
 				
-				terminal.PrintString(WELCOME_MESSAGE);
+				terminal.WriteString(WELCOME_MESSAGE);
 			}
 			else
 			{
-				terminal.PrintString("~");
+				terminal.WriteString("~");
 			}
 		}
 		else
 		{
-			terminal.PrintString("~");		
+			terminal.WriteString("~");		
 		}
 
 		terminal.ClearCurrentRow();
 		
-		if (y < size.row - 1)
+		if (y < m_TerminalSize.row - 1)
 		{
-			terminal.PrintString("\r\n");
+			terminal.WriteString("\r\n");
 		}
 	}
 }
 
-bool Editor::ProcessKey(char key, Terminal& terminal)
+bool Editor::ProcessKey(TerminalKey key)
 {
-	switch (key)
+	switch (key.GetChar())
 	{
-	case TerminalKeyCtrl('q'):
-		terminal.SetCursorPosition({ 0, 0 });
-		return false;
+	case 'q':
+		if (key.IsCtrl())
+		{
+			return false;
+		}
+		break;
 
+	case TerminalKeys::ARROW_UP:
+	case TerminalKeys::ARROW_DOWN:
+	case TerminalKeys::ARROW_LEFT:
+	case TerminalKeys::ARROW_RIGHT:
 	case 'w':
 	case 'a':
 	case 's':
 	case 'd':
-		this->ProcessMoveCursor(key, terminal);
-		return true;
+		this->ProcessMoveCursor(key);
+		break;
+
+	case TerminalKeys::PAGE_UP:
+	case TerminalKeys::PAGE_DOWN:
+		m_Cursor.row = (key.GetChar() == TerminalKeys::PAGE_UP
+						? 0
+						: m_TerminalSize.row - 1);
+		break;
 		
-	default:
-		return true;
 	}
+
+	return true;
 }
 
-void Editor::ProcessMoveCursor(char key, Terminal& terminal)
+void Editor::ProcessMoveCursor(TerminalKey key)
 {
-	switch (key)
+	switch (key.GetChar())
 	{
+	case TerminalKeys::ARROW_UP:
 	case 'w':
-		m_Cursor.row--;
+		if (m_Cursor.row != 0)
+		{
+			m_Cursor.row--;	
+		}
 		break;
+	case TerminalKeys::ARROW_LEFT:
 	case 'a':
-		m_Cursor.column--;
+		if (m_Cursor.column != 0)
+		{
+			m_Cursor.column--;	
+		}
 		break;
+	case TerminalKeys::ARROW_DOWN:
 	case 's':
-		m_Cursor.row++;
+		if (m_Cursor.row != m_TerminalSize.row - 1)
+		{
+			m_Cursor.row++;	
+		}
 		break;
+	case TerminalKeys::ARROW_RIGHT:
 	case 'd':
-		m_Cursor.column++;
+		if (m_Cursor.column != m_TerminalSize.column - 1)
+		{
+			m_Cursor.column++;	
+		}
 		break;
 	default:
 		assert(false && "This should not be occured. Key argument is wrong, probably there is a mistake in switch in Editor::ProcessKey.");

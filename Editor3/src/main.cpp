@@ -35,8 +35,8 @@ int main(int argc, char* argv[])
 		while (running)
 		{
 			editor.RefreshScreen(*terminal);
-			char pressedKey = terminal->WaitAndReadKey();
-			running = editor.ProcessKey(pressedKey, *terminal);
+			TerminalKey pressedKey = terminal->WaitAndReadKey();
+			running = editor.ProcessKey(pressedKey);
 		}
 	}
 	catch (const UnrecoverableTerminalImplementationError& e)
@@ -72,6 +72,7 @@ void ExitRawMode(Terminal& terminal)
 	try
 	{
 		terminal.ClearScreen();
+		terminal.Flush();
 	}
 	catch (const UnrecoverableTerminalImplementationError& e)
 	{
@@ -89,14 +90,26 @@ void ExitRawMode(Terminal& terminal)
 			// NOTE: Ignoring. Don't know what to do. Also because that is exit.
 		}
 	}
+
+	try
+	{
+		terminal.SetCursorPosition({ 0, 0 });
+		terminal.Flush();
+	}
+	catch (const UnrecoverableTerminalImplementationError& e)
+	{
+		// NOTE: Ignoring. Don't know what to do. Also because that is exit.
+	}
 }
 
 void Die(int status, Terminal& terminal, const std::string& msg)
 {
 	ExitRawMode(terminal);
 
-	terminal.PrintString(msg);
-	terminal.PrintString("\n");
+	// TODO: What if there is an exception?
+	terminal.WriteString(msg);
+	terminal.WriteString("\n");
+	terminal.Flush();
 	
 	exit(status);
 }
@@ -105,9 +118,11 @@ void Die(int status, Terminal& terminal, const std::string& prefixStr, const std
 {
 	ExitRawMode(terminal);
 
-	terminal.PrintString(prefixStr);
-	terminal.PrintString(postfixStr);
-	terminal.PrintString("\n");
+	// TODO: What if there is an exception?
+	terminal.WriteString(prefixStr);
+	terminal.WriteString(postfixStr);
+	terminal.WriteString("\n");
+	terminal.Flush();
 	
 	exit(status);
 }
