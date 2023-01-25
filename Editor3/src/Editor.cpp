@@ -7,7 +7,7 @@
 Editor::Editor()
 	: m_Cursor{ 0, 0 }, m_TerminalSize{ 0, 0 }
 {
-	
+	m_Buffer.push_back({ 'H', 'E', 'L', 'l', 'o', '!' });
 }
 
 void Editor::RefreshScreen(Terminal& terminal)
@@ -29,30 +29,23 @@ void Editor::DrawRows(Terminal& terminal)
 {
 	for (int y = 0; y < m_TerminalSize.row; y++)
 	{
-		if (y == m_TerminalSize.row / 3)
+		if (y >= m_Buffer.size())
 		{
-			if (m_TerminalSize.column > sizeof(WELCOME_MESSAGE))
-			{
-				// TODO: Position the welcome string more pretty.
-				unsigned padding = (m_TerminalSize.column - sizeof(WELCOME_MESSAGE)) / 2;
-				if (padding != 0)
-				{
-					terminal.WriteString("~");
-					padding--;
-				}
-
-				terminal.WriteString(std::string(padding, ' '));
-				
-				terminal.WriteString(WELCOME_MESSAGE);
-			}
-			else
-			{
-				terminal.WriteString("~");
-			}
+			this->DrawDefaultRow(y, terminal);
 		}
 		else
 		{
-			terminal.WriteString("~");		
+			// TODO: Two modes: the exceeding part of the line is not shown or it is printed on next line.
+			std::vector<char>& line = m_Buffer[y];
+			
+			unsigned sizeToPrint = line.size();
+			if (sizeToPrint > m_TerminalSize.column)
+			{
+				sizeToPrint = m_TerminalSize.column;
+			}
+
+			// TODO: Do not create a copy of editor row.
+			terminal.WriteString(std::string(line.begin(), line.end()));
 		}
 
 		terminal.ClearCurrentRow();
@@ -61,6 +54,35 @@ void Editor::DrawRows(Terminal& terminal)
 		{
 			terminal.WriteString("\r\n");
 		}
+	}
+}
+
+void Editor::DrawDefaultRow(unsigned y, Terminal& terminal)
+{	
+	if (y == m_TerminalSize.row / 3)
+	{
+		if (m_TerminalSize.column > sizeof(WELCOME_MESSAGE))
+		{
+			// TODO: Position the welcome string more pretty.
+			unsigned padding = (m_TerminalSize.column - sizeof(WELCOME_MESSAGE)) / 2;
+			if (padding != 0)
+			{
+				terminal.WriteString("~");
+				padding--;
+			}
+
+			terminal.WriteString(std::string(padding, ' '));
+				
+			terminal.WriteString(WELCOME_MESSAGE);
+		}
+		else
+		{
+			terminal.WriteString("~");
+		}
+	}
+	else
+	{
+		terminal.WriteString("~");		
 	}
 }
 
@@ -87,12 +109,18 @@ bool Editor::ProcessKey(TerminalKey key)
 		break;
 
 	case TerminalKeys::PAGE_UP:
-	case TerminalKeys::PAGE_DOWN:
-		m_Cursor.row = (key.GetChar() == TerminalKeys::PAGE_UP
-						? 0
-						: m_TerminalSize.row - 1);
+		m_Cursor.row = 0;
 		break;
-		
+	case TerminalKeys::PAGE_DOWN:
+		m_Cursor.row = m_TerminalSize.row - 1;
+		break;
+
+	case TerminalKeys::HOME:
+		m_Cursor.column = 0;
+		break;
+	case TerminalKeys::END:
+		m_Cursor.column = m_TerminalSize.column - 1;
+		break;
 	}
 
 	return true;

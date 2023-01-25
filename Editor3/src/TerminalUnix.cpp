@@ -250,7 +250,7 @@ public:
 			throw UnrecoverableTerminalImplementationError("unable to write to the terminal");
 		}
 	}
-	
+
 private:
 	std::stringstream m_Buffer;
 
@@ -295,44 +295,63 @@ private:
 			return MakeKey('\x1b');
 		}
 
-		if (seq[0] != '[')
+		if (seq[0] == '[')
 		{
-			return MakeKey('\x1b');
-		}
-
-		if (seq[1] >= '0' && seq[1] <= '9')
-		{
-			if (read(STDIN_FILENO, &seq[2], 1) != 1)
+			if (seq[1] >= '0' && seq[1] <= '9')
 			{
-				return MakeKey('\x1b');
-			}
-
-			if (seq[2] == '~')
-			{
-				switch (seq[1])
+				if (read(STDIN_FILENO, &seq[2], 1) != 1)
 				{
-				case '5':
-					return MakeKey(TerminalKeys::PAGE_UP);
-				case '6':
-					return MakeKey(TerminalKeys::PAGE_DOWN);
-				default:
 					return MakeKey('\x1b');
 				}
-			}			
-		}
+
+				if (seq[2] == '~')
+				{
+					switch (seq[1])
+					{
+					case '1':
+					case '7':
+						return MakeKey(TerminalKeys::HOME);
+					case '3':
+						return MakeKey(TerminalKeys::DELETE);
+					case '4':
+					case '8':
+						return MakeKey(TerminalKeys::END);
+					case '5':
+						return MakeKey(TerminalKeys::PAGE_UP);
+					case '6':
+						return MakeKey(TerminalKeys::PAGE_DOWN);
+					default:
+						return MakeKey('\x1b');
+					}
+				}			
+			}
 		
-		switch (seq[1])
+			switch (seq[1])
+			{
+			case 'A':
+				return MakeKey(TerminalKeys::ARROW_UP);
+			case 'B':
+				return MakeKey(TerminalKeys::ARROW_DOWN);
+			case 'C':
+				return MakeKey(TerminalKeys::ARROW_RIGHT);
+			case 'D':
+				return MakeKey(TerminalKeys::ARROW_LEFT);
+			case 'H':
+				return MakeKey(TerminalKeys::HOME);
+			case 'F':
+				return MakeKey(TerminalKeys::END);
+			}
+		}
+		else if (seq[0] == 'O')
 		{
-		case 'A':
-			return MakeKey(TerminalKeys::ARROW_UP);
-		case 'B':
-			return MakeKey(TerminalKeys::ARROW_DOWN);
-		case 'C':
-			return MakeKey(TerminalKeys::ARROW_RIGHT);
-		case 'D':
-			return MakeKey(TerminalKeys::ARROW_LEFT);
+			switch (seq[1])
+			{
+			case 'H':
+				return MakeKey(TerminalKeys::HOME);
+			case 'F':
+				return MakeKey(TerminalKeys::END);
+			}
 		}
-		
 
 		return MakeKey('\x1b');
 	}

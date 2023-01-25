@@ -85,7 +85,12 @@ namespace TerminalKeys
 		ARROW_DOWN,
 
 		PAGE_UP,
-		PAGE_DOWN
+		PAGE_DOWN,
+
+		HOME,
+		END,
+
+		DELETE
 	};
 }
 
