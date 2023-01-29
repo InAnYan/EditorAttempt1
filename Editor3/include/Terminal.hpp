@@ -12,6 +12,8 @@
 #include <exception>
 #include <string>
 #include <memory>
+#include <vector>
+#include <cstdint>
 
 /// Exception that represents an error on the implementation side.
 class UnrecoverableTerminalImplementationError : std::exception
@@ -80,6 +82,8 @@ namespace TerminalKeys
 {
 	enum
 	{
+		ESCAPE = '\x1b',
+		
 		ARROW_LEFT = 1000,
 		ARROW_RIGHT,
 		ARROW_UP,
@@ -91,29 +95,52 @@ namespace TerminalKeys
 		HOME,
 		END,
 
-		DELETE
+		DELETE,
+		BACKSPACE
 	};
 }
 
 /// Terminal coordinate representation. Also used to represent size of a terminal.
 struct TerminalCoord
 {
-	/// The X coordinate.
-	int column;
-	/// The Y coordinate.
-	int row;
+	/// The X (column) coordinate.
+	int x;
+	/// The Y (row) coordinate.
+	int y;
+};
+
+/// Representation of a color in a terminal.
+// TODO: How TerminalColor struct (or class) should be defined? What if the user wants to use not RGB or not 256 values?
+struct TerminalColor
+{
+	/// The red channel of the color.
+	int r;
+	/// The green channel of the color.
+	int g;
+	/// The blue channel of the color.
+	int b;
+
+	/// Return a new TerminalColor which has the inverted color of original.
+	TerminalColor Inverted() const
+	{
+		// TODO: The code for inverted color generation looks ugly.
+		return { 255 - r, 255 - g, 255 - b };
+	}
 };
 
 /// Interface for Terminal.
 /// Note: all functions of a Terminal may raise UnrecoverableTerminalImplementationError.
 /// Note: there are instant operations and buffered. The result of instant operation will be instant. The result of buffered operation may be seen only after call to Terminal::Flush or without the call.
-/// Note: The implementation is permitted to perform buffered operations as instant.
+/// Note: the implementation is permitted to perform buffered operations as instant.
+/// Note: the results of buffered operations may not be shown from instant operations (E.g. if the cursor position changed, the Terminal::GetCursorPosition may return the unchanged position.)
+/// Note: the color of text after a creation of Terminal instance is the same as was before the creation.
+/// Note: the Terminal class and instances are not thread-safe.
 class Terminal
 {
 public:
 	/// Terminal is an interface, so the default constructor is deleted.
 	//Terminal() = delete;
-	/// A virtual destruct of a Terminal.
+	/// A virtual destructor of a Terminal.
 	virtual ~Terminal() {}
 
 	/// Instant operations:
@@ -132,12 +159,12 @@ public:
 
 	/// Get the position of terminal cursor (instant operation).
 	virtual const TerminalCoord GetCursorPosition() = 0;
-
-	/// UNDOCUMENTED (immediate operation).
+	
+	/// UNDOCUMENTED (instant operation).
 	// TODO: DOCUMENT.
 	virtual TerminalKey WaitAndReadKey() = 0;
 
-	/// Perform all buferred operations at once.
+	/// Perform all buferred operations at once (instant operation).
 	virtual void Flush() = 0;
 	
 	/// Buffered operations:
@@ -146,7 +173,10 @@ public:
 	virtual void ClearScreen() = 0;
 	/// Clear row on the cursor (buffered operation).
 	virtual void ClearCurrentRow() = 0;
-
+	
+	/// UNDOCUMENTED (buffered operation).
+	// TODO: DOCUMENT.
+	virtual void RevertAllAttributes() = 0;
     
 	/// Position the Terminal's cursor (buffered operation).
 	/// Note: the origin is at the top left corner and its coordinate is (0; 0).
@@ -156,9 +186,27 @@ public:
 	virtual void HideCursor() = 0;
 	/// Show terminal cursor (buffered operation). Do nothing if shown.
 	virtual void ShowCursor() = 0;
-	
+
+	/// Print a character (buffered operation),
+	// CRUCIAL: What if character type is not a char?
+	virtual void WriteCharacter(char character) = 0;
+
 	/// Print a string (buffered operation).
 	virtual void WriteString(const std::string& str) = 0;
+	/// Print a part of astring (buffered operation).
+	virtual void WriteString(const std::string& str, size_t start, size_t length) = 0;
+
+	/// Print a vector of chars as a string (buffered operation).
+	virtual void WriteCharVector(const std::vector<char>& vector) = 0;
+	/// Print a part of a vector of chars as a string (buffered operation).
+	virtual void WriteCharVector(const std::vector<char>& vector, size_t start, size_t length) = 0;
+	
+	/// Set the color of characters for next text.
+	/// Note: the implementation may not show the exact color, but it should show the closest possible color to the color argument.
+	virtual void SetForegroundColor(TerminalColor color) = 0;
+	/// Set the color of background for next text.
+	/// Note: the implementation may not show the exact color, but it should show the closest possible color to the color argument.
+	virtual void SetBackgroundColor(TerminalColor color) = 0;
 };
 
 /// A terminal based on standard input and output streams.

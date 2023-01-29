@@ -32,18 +32,7 @@ int main(int argc, char* argv[])
 
 	try
 	{
-		std::ifstream file(argv[1]);
-		if (!file)
-		{
-			Die(3, terminal, "Error: unable to open the file.");
-		}
-
-		Editor editor(file);
-
-		if (file.fail() && !file.eof())
-		{
-			Die(4, terminal, "Error: an error occured while reading the file.");
-		}
+		Editor editor(argv[1]);
 
 		EnterRawMode(terminal);
 		
@@ -56,6 +45,11 @@ int main(int argc, char* argv[])
 		}
 	}
 	catch (const UnrecoverableTerminalImplementationError& e)
+	{
+		ExitRawMode(terminal);
+		Die(1, terminal, "Fatal error: ", e.what());
+	}
+	catch (const EditorFileIOError& e)
 	{
 		ExitRawMode(terminal);
 		Die(1, terminal, "Fatal error: ", e.what());

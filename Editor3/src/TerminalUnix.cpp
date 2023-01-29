@@ -21,6 +21,8 @@
 
 #include <sstream>
 
+// TODO: Ctrl-H maybe mapped to backspace.
+
 class UnixTerminal : public Terminal
 {
 public:
@@ -190,7 +192,7 @@ public:
 		}
 
 		TerminalCoord size;
-		if (sscanf(&buf[2], "%d;%d", &size.column, &size.row) != 2)
+		if (sscanf(&buf[2], "%d;%d", &size.x, &size.y) != 2)
 		{
 			throw UnrecoverableTerminalImplementationError("unable to get the size of the terminal");
 		}
@@ -210,7 +212,7 @@ public:
 	{
 		char buffer[16];
 
-		int result = snprintf(buffer, sizeof(buffer), "\x1b[%d;%dH", coord.row + 1, coord.column + 1);
+		int result = snprintf(buffer, sizeof(buffer), "\x1b[%d;%dH", coord.y + 1, coord.x + 1);
 		if (result > sizeof(buffer) || result < 0) // TODO: Is that right comparison?
 		{
 			throw UnrecoverableTerminalImplementationError("unable to change the position of the cursor because it is too big to form a message to the terminal");
@@ -218,12 +220,39 @@ public:
 
 		m_Buffer << buffer;
 	}
-	
-	virtual void WriteString(const std::string& str) override
+
+	virtual void WriteCharacter(char character) override
 	{
-		m_Buffer << str;
+		// TODO: What if the user sends an escape sequence to the terminal?
+		m_Buffer << character;
 	}
 
+	virtual void WriteString(const std::string& str) override
+	{
+		this->WriteString(str, 0, str.size());
+	}
+
+	virtual void WriteCharVector(const std::vector<char>& vector) override
+	{
+		this->WriteCharVector(vector, 0, vector.size());
+	}
+	
+	virtual void WriteString(const std::string& str, size_t start, size_t length) override
+	{
+		for (size_t i = 0; i < length; i++)
+		{
+			this->WriteCharacter(str[start + i]);
+		}
+	}
+
+	virtual void WriteCharVector(const std::vector<char>& vector, size_t start, size_t length) override
+	{
+		for (size_t i = 0; i < length; i++)
+		{
+			this->WriteCharacter(vector[start + i]);
+		}
+	}
+	
 	virtual void HideCursor() override
 	{
 		m_Buffer << "\x1b[?25l";
@@ -251,6 +280,21 @@ public:
 		}
 	}
 
+	virtual void SetForegroundColor(TerminalColor color) override
+	{
+		m_Buffer << "\x1b[38;2;" << color.r << ";" << color.g << ";" << color.b << "m";
+	}
+
+	virtual void SetBackgroundColor(TerminalColor color) override
+	{
+		m_Buffer << "\x1b[48;2;" << color.r << ";" << color.g << ";" << color.b << "m";
+	}
+
+	virtual void RevertAllAttributes() override
+	{
+		m_Buffer << "\x1b[m";
+	}
+	
 private:
 	std::stringstream m_Buffer;
 
