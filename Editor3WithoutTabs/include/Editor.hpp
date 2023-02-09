@@ -3,11 +3,10 @@
 
 #include <vector>
 #include <exception>
-#include <filesystem>
 
 #include "Terminal.hpp"
 
-/// If some error occurse while opening, reading or writing to the file, then EditorFileIOError thrown.
+/// If some error occurse while opening, reading or writing to the file, thenn EditorFileIOError thrown.
 class EditorFileIOError : std::exception
 {
 public:
@@ -27,23 +26,22 @@ private:
 	const char* m_Msg;
 };
 
+using Row = std::vector<char>;
+
 /// The editor.
 class Editor
 {
 public:
 	/// Create an editor with file.
-	/// Note: if the file does not exist, then a new file is created.
-	Editor(const std::filesystem::path& filePath);
+	/// Note: the caller should ensure that there is no error with file read.
+	// TODO: Types of arguments?
+	Editor(const std::string& filePath);
 	
 	/// Redraw the editor screen.
 	void RefreshScreen(std::shared_ptr<Terminal> terminal);
 	/// Process the key. Return true if the editor is alive, otherwise, false.
-	/// Note: may throw an EditorFileIOError.
 	bool ProcessKey(TerminalKey key);
 
-	/// Show a message in the message bar.
-	void ShowMessage(const std::string& msg, int lifeTime);
-	
 	/// Change the tab size.
 	void SetTabSize(int newSize);
 	
@@ -51,7 +49,6 @@ private:
 	/// The state of the cursor in buffer.
 	TerminalCoord m_Cursor = { 0, 0 };
 	/// The real X coordinate of the screen. When there is no tabs it is equal to m_Cursor.x, else it will be greater depending on tab count and tab stop.
-	int m_Rx = m_Cursor.x;
 	/// The last known size of the terminal.
 	TerminalCoord m_TerminalSize = { 0, 0 };
 	/// The size of buffer area (origin at the (0;0) of the terminal).
@@ -69,38 +66,16 @@ private:
 	/// The color of characters.
 	TerminalColor m_ForegroundColor = { 255, 255, 255 };
 	
-	/// Convert buffer cursor X coordinate to real terminal X coordinate.
-	void ConvertCxToRx();
-	
-	// TODO: DOCUMENT.
-	struct Row
-	{
-		std::vector<char> real;
-		std::vector<char> render;
-	};
-
-	/// Insert a character to a buffer row.
-	void RowInsertChar(Row& row, int at, char ch);
-	/// Delete a character in a buffer row.
-	void RowDeleteChar(Row& row, int at);
-	
 	/// Insert the character to the current row.
 	void InsertChar(char ch);
-	/// Delete the character in the current row.
-	void DeleteChar();
-	/// Create new line.
-	void InsertNewLine();
-	
-	/// The absolute path to the current opened file.
+
+	/// The path to the current opened file.
 	std::string m_FilePath;
 	/// The name of the current opened file.
 	std::string m_FileName;
 
 	// TODO: Document.
-	std::vector<Row> m_Buffer;
-
-	/// Was file modified.
-	bool m_FileDirty = false;
+	std::vector<std::vector<char>> m_Buffer;
 
 	/// Save the buffer to the m_FilePath.
 	void Save();
@@ -109,9 +84,11 @@ private:
 	std::string m_MessageBarText;
 	/// The count of screen refereshes before clearing m_StatusLine.
 	int m_MessageBarTextLifeTime;
+
+	/// Show a message in the message bar.
+	void ShowMessage(const std::string& msg, int lifeTime);
 	
 	void AppendRow(const std::string& str);
-	void UpdateRow(Row& row);
 	
 	/// Draw editor main rows.
 	void DrawRows(std::shared_ptr<Terminal> terminal);
@@ -123,13 +100,14 @@ private:
 	void DrawMessageBar(std::shared_ptr<Terminal> terminal);
 
 	/// Change the m_RowOffset if the m_Cursor is out of range of m_TerminalScreen.
+	void RowInsertChar(Row& row, int at, char ch);
+
 	void Scroll();
 	
 	/// Move cursor according to the key.
 	void ProcessMoveCursor(TerminalKey key);
 
-    // TODO: DOCUMENT
-	int m_ExitConfirmations = 3;
+	void SetCursorForTerminal(std::shared_ptr<Terminal> terminal);
 };
 
 #endif // EDITOR_EDITOR_HPP

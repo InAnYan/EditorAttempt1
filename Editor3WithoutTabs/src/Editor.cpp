@@ -4,21 +4,19 @@
 #include <iomanip>
 #include <fstream>
 
-#define WELCOME_MESSAGE "Welcome to the Editor! Version 0.0.1."
-#define HELP_MESSAGE "HELP: Ctrl-Q - exit | Ctrl-S - save file."
+#define WELCOME_MESSAGE "Welcome to the Editor! Version 0.0.1"
 
-Editor::Editor(const std::filesystem::path& filePath)
-	: m_FilePath(std::filesystem::absolute(filePath)),
-	  m_FileName(filePath.filename())
+Editor::Editor(const std::string& filePath)
+	: m_FilePath(filePath),
+	  m_FileName(filePath) // TODO: Extract file name from file path.
 {
 	std::ifstream file(filePath);
 	if (!file)
 	{
-		this->ShowMessage("New file: '" + filePath.string() + "'. " HELP_MESSAGE, 1);
-		return;
+		throw EditorFileIOError("unable to open the file");
 	}
 	
-   	// TODO: Line endings.
+	// TODO: Line endings.
 	std::string lineOfFile;
 	while (std::getline(file, lineOfFile))
 	{
@@ -30,7 +28,7 @@ Editor::Editor(const std::filesystem::path& filePath)
 		throw EditorFileIOError("an error occured while reading the file");
 	}
 
-	this->ShowMessage(HELP_MESSAGE, 1);
+	this->ShowMessage("Welcome to the editor!", 1);
 }
 
 void Editor::RefreshScreen(std::shared_ptr<Terminal> terminal)
@@ -51,7 +49,9 @@ void Editor::RefreshScreen(std::shared_ptr<Terminal> terminal)
 	this->DrawStatusBar(terminal);
 	this->DrawMessageBar(terminal);
 	
-	terminal->SetCursorPosition({ m_Rx - m_Offset.x, m_Cursor.y - m_Offset.y });
+	this->SetCursorForTerminal(terminal);
+
+	
 	terminal->ShowCursor();
 
 	terminal->RevertAllAttributes();
@@ -66,18 +66,32 @@ void Editor::RefreshScreen(std::shared_ptr<Terminal> terminal)
 	}
 }
 
+void Editor::SetCursorForTerminal(std::shared_ptr<Terminal> terminal)
+{
+	int rx = 0;
+	const Row& curLine = m_Buffer[m_Cursor.y];
+
+	for (int i = 0; i < m_Cursor.x; i++)
+	{
+		if (curLine[i] == '\t')
+		{
+			// **** TabStop
+			// **   (rx % ts)
+			//   ** ts - (rx % ts)
+			rx += m_TabStop - (rx % m_TabStop);
+		}
+		else
+		{
+			rx++;
+		}
+	}
+	
+	terminal->SetCursorPosition({ rx - m_Offset.x, m_Cursor.y - m_Offset.y });
+}
+
 void Editor::Scroll()
 {
 	// TODO: Make two modes: 1-line scrolling and page scrolling.
-
-	if (m_Cursor.y < m_Buffer.size())
-	{
-		this->ConvertCxToRx();
-	}
-	else
-	{
-		m_Rx = 0;
-	}
 	
 	if (m_Cursor.y < m_Offset.y)
 	{
@@ -89,35 +103,14 @@ void Editor::Scroll()
 		m_Offset.y = m_Cursor.y - m_BufferArea.y + 1;
 	}
 
-	if (m_Rx < m_Offset.x)
+	if (m_Cursor.x < m_Offset.x)
 	{
-		m_Offset.x = m_Rx;
+		m_Offset.x = m_Cursor.x;
 	}
 
-	if (m_Rx >= m_Offset.x + m_BufferArea.x)
+	if (m_Cursor.x >= m_Offset.x + m_BufferArea.x)
 	{
-		m_Offset.x = m_Rx - m_BufferArea.x + 1;
-	}
-}
-
-void Editor::ConvertCxToRx()
-{
-	const Row& row = m_Buffer[m_Cursor.y];
-	
-	m_Rx = 0;
-	for (int i = 0; i < m_Cursor.x; i++)
-	{
-		if (row.real[i] == '\t')
-		{
-			// **** TabStop
-			// **   (rx % ts)
-			//   ** ts - (rx % ts)
-			m_Rx += m_TabStop - (m_Rx % m_TabStop);
-		}
-		else
-		{
-			m_Rx++;
-		}
+		m_Offset.x = m_Cursor.x - m_BufferArea.x + 1;
 	}
 }
 
@@ -134,26 +127,22 @@ void Editor::DrawRows(std::shared_ptr<Terminal> terminal)
 		else
 		{
 			// TODO: Two modes: the exceeding part of the line is not shown or it is printed on next line.
-			const std::vector<char>& line = m_Buffer[fileRow].render;
+			const std::vector<char>& line = m_Buffer[fileRow];
 			
-			int sizeToPrint = line.size() - m_Offset.x;
-
-			if (sizeToPrint < 0)
+			int rx = 0;
+			for (int i = m_Offset.x; i < m_BufferArea.x && i < line.size(); i++)
 			{
-				sizeToPrint = 0;
-			}
-			
-			if (sizeToPrint > m_BufferArea.x)
-			{
-				sizeToPrint = m_BufferArea.x;
-			}
-
-			if (sizeToPrint != 0)
-			{
-				std::vector<char> subvec = std::vector<char>(line.begin() + m_Offset.x, line.begin() + m_Offset.x + sizeToPrint);
-
-				
-				terminal->WriteCharVector(line, m_Offset.x, sizeToPrint);
+				if (line[i] == '\t')
+				{
+					int oldRx = rx;
+					rx += m_TabStop - (rx % m_TabStop);
+					terminal->WriteString(std::string(rx - oldRx, ' '));
+				}
+				else
+				{
+					terminal->WriteCharacter(line[i]);
+					rx++;
+				}
 			}
 		}
 
@@ -198,26 +187,12 @@ void Editor::DrawStatusBar(std::shared_ptr<Terminal> terminal)
 	terminal->SetForegroundColor(m_ForegroundColor.Inverted());
 
 	// Style: name, percent, line, character.
-	// " - name - percent - LN - CN - modified ------- "
+	// " - name - percent - LN - CN -------- "
 	std::stringstream ss;
 	ss << " - " << m_FileName << " - ";
-	ss << std::setw(3);
-	if (m_Buffer.size() == 0)
-	{
-		ss << 0;
-	}
-	else if (m_Cursor.y == m_Buffer.size())
-	{
-		ss << 100;
-	}
-	else
-	{
-		int percent = (m_Cursor.y + 1) / static_cast<float>(m_Buffer.size()) * 100;
-		ss << percent;
-	}
-	ss << '%';
+	int percent = (m_Cursor.y + 1) / static_cast<float>(m_Buffer.size()) * 100;
+	ss << std::setw(3) << percent << '%';
 	ss << " - L" << (m_Cursor.y + 1) << " - C" << (m_Cursor.x + 1) << " -";
-	ss << " " << (m_FileDirty ? "**" : "  ") << " -";
 	std::string statusStr = ss.str();
 
 	if (statusStr.size() <= m_TerminalSize.x)
@@ -261,17 +236,7 @@ bool Editor::ProcessKey(TerminalKey key)
 	case 'q':
 		if (key.IsCtrl())
 		{
-			if (m_FileDirty && m_ExitConfirmations > 0)
-			{
-				// TODO: Unsafe exit confirmation integer to string.
-				this->ShowMessage("WARNING: File has unsaved changes. Press Ctrl-Q " + std::to_string(m_ExitConfirmations) + " more to really exit.", 1);
-				m_ExitConfirmations--;
-				return true;
-			}
-			else
-			{
-				return false;
-			}
+			return false;
 		}
 		else
 		{
@@ -282,7 +247,8 @@ bool Editor::ProcessKey(TerminalKey key)
 	case 'm':
 		if (key.IsCtrl())
 		{
-			this->InsertNewLine();
+			// TODO: Editor process enter key.
+			return false;
 		}
 		else
 		{
@@ -303,15 +269,12 @@ bool Editor::ProcessKey(TerminalKey key)
 		
 	case TerminalKeys::DELETE:
 	case TerminalKeys::BACKSPACE:
-		if (key.GetChar() == TerminalKeys::DELETE)
-		{
-			ProcessMoveCursor(TerminalKey(TerminalKeys::ARROW_RIGHT, false, false));
-		}
-		this->DeleteChar();
-		break;
+		// TODO: Editor process deleting keys.
+		return false;
 
 	case TerminalKeys::ESCAPE:
-		break;
+		// TODO: Editor process escape key.
+		return false;
 		
 	case TerminalKeys::ARROW_UP:
 	case TerminalKeys::ARROW_DOWN:
@@ -358,10 +321,10 @@ bool Editor::ProcessKey(TerminalKey key)
 	case TerminalKeys::END:
 		if (m_Cursor.y < m_Buffer.size())
 		{
-			m_Cursor.x = m_Buffer[m_Cursor.y].real.size();
+			m_Cursor.x = m_Buffer[m_Cursor.y].size();
 		}
 		break;
-		
+
 	default:
 		if (key.IsCtrl() || key.IsAlt())
 		{
@@ -375,7 +338,6 @@ bool Editor::ProcessKey(TerminalKey key)
 		break;
 	}
 
-	m_ExitConfirmations = 3;
 	return true;
 }
 
@@ -385,7 +347,7 @@ void Editor::ProcessMoveCursor(TerminalKey key)
 	// TODO: Word jump.
 	// TODO: Save last cursor pos, if entered a small line.
 	
-	const std::vector<char>* line = (m_Cursor.y >= m_Buffer.size() ? nullptr : &m_Buffer[m_Cursor.y].real);
+	const std::vector<char>* line = (m_Cursor.y >= m_Buffer.size() ? nullptr : &m_Buffer[m_Cursor.y]);
 	
 	switch (key.GetChar())
 	{
@@ -405,7 +367,7 @@ void Editor::ProcessMoveCursor(TerminalKey key)
 		else if (m_Cursor.y > 0)
 		{
 			m_Cursor.y--;
-			m_Cursor.x = m_Buffer[m_Cursor.y].real.size();
+			m_Cursor.x = m_Buffer[m_Cursor.y].size();
 		}
 		break;
 	case TerminalKeys::ARROW_DOWN:
@@ -432,7 +394,7 @@ void Editor::ProcessMoveCursor(TerminalKey key)
 		break;
 	}
 
-	line = (m_Cursor.y >= m_Buffer.size() ? nullptr : &m_Buffer[m_Cursor.y].real);
+	line = (m_Cursor.y >= m_Buffer.size() ? nullptr : &m_Buffer[m_Cursor.y]);
 	int rowLength = line != nullptr ? line->size() : 0;
 	if (m_Cursor.x > rowLength)
 	{
@@ -442,52 +404,20 @@ void Editor::ProcessMoveCursor(TerminalKey key)
 
 void Editor::SetTabSize(int newSize)
 {
-	if (newSize == m_TabStop)
-	{
-		return;
-	}
-
 	if (newSize <= 0)
 	{
 		throw std::out_of_range("new tab stop size is 0 or negative, but should be greater than 0");
 	}
 
 	m_TabStop = newSize;
-
-	for (Row& row : m_Buffer)
-	{
-		this->UpdateRow(row);
-	}
 }
 
 void Editor::AppendRow(const std::string& str)
 {
 	m_Buffer.push_back(Row());
 
-	m_Buffer.back().real = std::vector<char>(str.begin(), str.end());
-	this->UpdateRow(m_Buffer.back());
+	m_Buffer.back() = std::vector<char>(str.begin(), str.end());
 }	
-
-void Editor::UpdateRow(Row& row)
-{
-	row.render.clear();
-	
-	for (int i = 0; i < row.real.size(); i++)
-	{
-		if (row.real[i] == '\t') {
-            
-			row.render.push_back(' ');
-			while (row.render.size() % m_TabStop != 0)
-			{
-				row.render.push_back(' ');
-			}
-		}
-		else
-		{
-			row.render.push_back(row.real[i]);
-		}
-	}
-}
 
 void Editor::RowInsertChar(Row& row, int at, char ch)
 {
@@ -496,14 +426,12 @@ void Editor::RowInsertChar(Row& row, int at, char ch)
 		at = 0;
 	}
 
-	if (at > row.real.size())
+	if (at > row.size())
 	{
-		at = row.real.size();
+		at = row.size();
 	}
 	
-	row.real.insert(row.real.begin() + at, ch);
-
-	this->UpdateRow(row);
+	row.insert(row.begin() + at, ch);
 }
 
 void Editor::InsertChar(char ch)
@@ -515,7 +443,6 @@ void Editor::InsertChar(char ch)
 	
 	this->RowInsertChar(m_Buffer[m_Cursor.y], m_Cursor.x, ch);
 	m_Cursor.x++;
-	m_FileDirty = true;
 }
 
 void Editor::ShowMessage(const std::string& msg, int lifeTime)
@@ -535,7 +462,7 @@ void Editor::Save()
 	for (Row& row : m_Buffer)
 	{
 		// TODO: Different types of line endings to save.
-		for (char ch : row.real)
+		for (char ch : row)
 		{
 			file << ch;
 		}
@@ -547,73 +474,4 @@ void Editor::Save()
 			throw EditorFileIOError("an error occured during the write to the file");
 		}
 	}
-
-	this->ShowMessage("Wrote '" + m_FilePath + "'.", 1);
-	m_FileDirty = false;
-}
-
-void Editor::RowDeleteChar(Row& row, int at)
-{
-	if (at < 0 || at > row.real.size())
-	{
-		return;
-	}
-
-	row.real.erase(row.real.begin() + at);
-	m_FileDirty = true;
-	this->UpdateRow(row);
-}
-
-void Editor::DeleteChar()
-{
-	// TODO: Bug when there is no text, but only one line is left.
-	if (m_Cursor.y == m_Buffer.size()
-		|| (m_Cursor.y == 0 && m_Cursor.x == 0))
-	{
-		return;
-	}
-
-	Row& row = m_Buffer[m_Cursor.y];
-	if (m_Cursor.x > 0)
-	{
-		this->RowDeleteChar(row, m_Cursor.x - 1);
-		m_Cursor.x--;
-	}
-	else
-	{
-		Row& previousRow = m_Buffer[m_Cursor.y - 1];
-		Row& currentRow  = m_Buffer[m_Cursor.y];
-		
-		m_Cursor.x = previousRow.real.size();
-
-		previousRow.real.insert(previousRow.real.end(), currentRow.real.begin(), currentRow.real.end());
-		m_Buffer.erase(m_Buffer.begin() + m_Cursor.y);
-		this->UpdateRow(previousRow);
-
-		m_Cursor.y--;
-	}
-}
-
-void Editor::InsertNewLine()
-{
-	if (m_Cursor.x == 0)
-	{
-		m_Buffer.insert(m_Buffer.begin() + m_Cursor.y, Row());
-	}
-	else
-	{
-		m_Buffer.insert(m_Buffer.begin() + m_Cursor.y + 1, Row());
-
-		Row& currentRow = m_Buffer[m_Cursor.y];
-		Row& newRow = m_Buffer[m_Cursor.y + 1];
-
-		newRow.real.insert(newRow.real.end(), currentRow.real.begin() + m_Cursor.x, currentRow.real.end());
-		currentRow.real.erase(currentRow.real.begin() + m_Cursor.x, currentRow.real.end());
-
-		this->UpdateRow(currentRow);
-		this->UpdateRow(newRow);
-	}
-	
-	m_Cursor.y++;
-	m_Cursor.x = 0;
 }

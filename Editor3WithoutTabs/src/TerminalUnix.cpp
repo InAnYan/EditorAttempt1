@@ -313,18 +313,10 @@ private:
 	TerminalKey MakeKey(int c)
 	{
 		// TODO: Support for Alt.
-
-		if (c == '\t')
-		{
-			return TerminalKey(c, false, false);
-		}
-		if (c == (c & 0x1F)) // TODO: Probably CTRL key checking is unsafe, was bug with tab. Tab is equal to some Ctrl key.
+		
+		if (c == (c & 0x1F))
 		{
 			return TerminalKey(c + 96, true, false);
-		}
-		else if (c == 127)
-		{
-			return TerminalKey(TerminalKeys::BACKSPACE, false, false);
 		}
 		else
 		{

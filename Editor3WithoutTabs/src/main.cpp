@@ -41,17 +41,15 @@ int main(int argc, char* argv[])
 		{
 			editor.RefreshScreen(terminal);
 			TerminalKey pressedKey = terminal->WaitAndReadKey();
-			try
-			{
-				running = editor.ProcessKey(pressedKey);
-			}
-			catch (const EditorFileIOError& e)
-			{
-				editor.ShowMessage(std::string("Error: ") + e.what(), 1);
-			}
+			running = editor.ProcessKey(pressedKey);
 		}
 	}
 	catch (const UnrecoverableTerminalImplementationError& e)
+	{
+		ExitRawMode(terminal);
+		Die(1, terminal, "Fatal error: ", e.what());
+	}
+	catch (const EditorFileIOError& e)
 	{
 		ExitRawMode(terminal);
 		Die(1, terminal, "Fatal error: ", e.what());
